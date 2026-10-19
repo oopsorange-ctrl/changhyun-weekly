@@ -153,11 +153,14 @@ html.widget .top .banner{-webkit-app-region:no-drag}
 .todo .del{opacity:0;color:var(--ink3);font-size:.8rem;line-height:1;padding:.1rem .2rem}
 .todo:hover .del{opacity:1}
 .todo .edit{flex:1;min-width:0;border:0;border-bottom:1px solid var(--todayLine);background:transparent;outline:0;font-size:.82rem}
-.add{border:0;background:transparent;outline:0;font-size:.8rem;padding:.2rem .15rem;width:100%;color:var(--ink);
-  border-top:1px dashed transparent;margin-top:auto;flex-shrink:0}
-.add::placeholder{color:var(--ink3)}
-.add:focus{border-top-color:var(--line)}
-.cell:not(:hover) .add:not(:focus):placeholder-shown{opacity:.45}
+.add{display:block;width:calc(100% - .7rem);margin:auto .35rem .35rem;flex-shrink:0;
+  min-height:2.9rem;padding:.55rem .65rem;border-radius:.5rem;outline:0;
+  border:1px solid transparent;background:var(--line2);color:var(--ink);
+  font-size:.84rem;font-weight:600;cursor:text;transition:background .12s,border-color .12s;text-shadow:none}
+.add::placeholder{color:var(--ink2);font-weight:800;opacity:1}
+.add:hover{background:var(--line);border-color:var(--line)}
+.add:focus{background:var(--paper);border-color:var(--todayLine);box-shadow:0 0 0 2px var(--today)}
+.add:focus::placeholder{color:var(--ink3);font-weight:600}
 
 /* ── 급식 / 날씨 ── */
 .side .head .ttl{font-size:.8rem;font-weight:800}
@@ -361,11 +364,14 @@ let todos = LS.get('cw.todos', {});
 const saveSettings = ()=>LS.set('cw.settings',settings);
 const saveTodos = ()=>LS.set('cw.todos',todos);
 let memo = LS.get('cw.memo','');
-// 종 시간 기본값 (창현고 실제 일과에 맞게 ✎ 편집에서 고치면 됨)
+// 창현고 종 시간 (50분 수업·10분 쉬는 시간, 3교시 뒤 점심, 7교시 16:40 종료)
 const DEFAULT_BELLS = [
-  {n:'1',s:'08:40',e:'09:30'},{n:'2',s:'09:40',e:'10:30'},{n:'3',s:'10:40',e:'11:30'},{n:'4',s:'11:40',e:'12:30'},
-  {n:'점심',s:'12:30',e:'13:20',lunch:1},{n:'5',s:'13:20',e:'14:10'},{n:'6',s:'14:20',e:'15:10'},{n:'7',s:'15:20',e:'16:10'}];
+  {n:'1',s:'09:00',e:'09:50'},{n:'2',s:'10:00',e:'10:50'},{n:'3',s:'11:00',e:'11:50'},
+  {n:'점심',s:'11:50',e:'12:50',lunch:1},
+  {n:'4',s:'12:50',e:'13:40'},{n:'5',s:'13:50',e:'14:40'},{n:'6',s:'14:50',e:'15:40'},{n:'7',s:'15:50',e:'16:40'}];
 let tt = Object.assign({ bells:DEFAULT_BELLS, week:{1:{},2:{},3:{},4:{},5:{}} }, LS.get('cw.tt',{}));
+// 예전 임시 기본값(08:40 시작)이 저장돼 있으면 새 창현고 종 시간으로 바꿈 (입력한 수업은 그대로)
+if(tt.bells && tt.bells[0] && tt.bells[0].s==='08:40' && tt.bells.length===8 && tt.bells[7].e==='16:10') tt.bells=DEFAULT_BELLS.map(b=>({...b}));
 const saveTT = ()=>LS.set('cw.tt',tt);
 
 /* ───────── 날짜 도우미 ───────── */
