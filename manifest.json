@@ -1,0 +1,14 @@
+{
+  "name": "창현 위클리",
+  "short_name": "창현 위클리",
+  "description": "창현고 교사용 2주 스케줄러 위젯",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F6F2EA",
+  "theme_color": "#F6F2EA",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
