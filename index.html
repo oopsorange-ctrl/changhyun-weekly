@@ -257,6 +257,10 @@ html.widget .ddpop{-webkit-app-region:no-drag}
 /* ── 시간표 편집 ── */
 dialog.wide{width:min(44rem,96vw)}
 .tt-wrap{overflow-x:auto}
+.tt-lunch{background:var(--meal);border-radius:.55rem;padding:.45rem .6rem}
+.tt-lunch small{color:var(--ink3);font-weight:400}
+.tt-lunch select{font-weight:700;padding:.2rem .3rem;border-radius:.4rem;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
+table.tt tr.lunch-row th{color:var(--mealInk)}
 table.tt{border-collapse:collapse;width:100%;font-size:.78rem}
 table.tt th{font-weight:700;color:var(--ink2);padding:.25rem .2rem;white-space:nowrap}
 table.tt td{padding:.12rem}
@@ -369,6 +373,11 @@ dialog::backdrop{background:rgba(0,0,0,.25)}
   <div class="dlg">
     <h2>🕘 내 시간표</h2>
     <p class="hint" style="margin-top:-.5rem">수업이 있는 칸에만 짧게 적으세요 (예: 2-3, 1-5 영어, 동아리). 비워 두면 공강으로 표시됩니다. 종 시간도 학교 일과에 맞게 고칠 수 있어요.</p>
+    <div class="row tt-lunch"><span>🍚 점심시간 위치 <small>(학년마다 다르면 여기서 바꾸세요)</small></span>
+      <select id="ttLunch" aria-label="점심시간 위치">
+        <option value="3">3교시 다음 (점심 → 4교시)</option>
+        <option value="4">4교시 다음 (4교시 → 점심)</option>
+      </select></div>
     <div class="tt-wrap"><table class="tt">
       <thead><tr><th></th><th>시작</th><th>끝</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th></tr></thead>
       <tbody id="ttBody"></tbody></table></div>
@@ -859,28 +868,53 @@ window.addEventListener('storage',e=>{ // 같은 PC의 다른 창과 동기화
 
 /* ───────── 시간표 편집 ───────── */
 const ttDlg=document.getElementById('ttDlg');
-function openTT(){
-  const days=['월','화','수','목','금'];
-  document.getElementById('ttBody').innerHTML = tt.bells.map((b,i)=>`<tr data-i="${i}">
-    <th>${b.lunch?'점심':esc(b.n)+'교시'}</th>
-    <td><input type="time" data-f="s" value="${esc(b.s)}"></td><td><input type="time" data-f="e" value="${esc(b.e)}"></td>
-    ${days.map((_,d)=>b.lunch?'<td class="lunch-td">—</td>':`<td><input type="text" maxlength="12" data-d="${d+1}" value="${esc((tt.week[d+1]||{})[b.n]||'')}" placeholder=""></td>`).join('')}
-  </tr>`).join('');
-  ttDlg.showModal();
+let ttDraft=null;   // 저장 전까지 고친 내용
+const toHM=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+function lunchPos(bells){ const i=bells.findIndex(b=>b.lunch), j=bells.findIndex(b=>b.n==='4'); return (i>=0&&j>=0&&i>j)?'4':'3'; }
+// 점심과 4교시 자리만 바꿈. 3교시 끝·5교시 시작은 그대로 두고 그 사이를 다시 나눔
+function moveLunch(bells, pos){
+  const out=bells.map(b=>({...b}));
+  const iL=out.findIndex(b=>b.lunch), i4=out.findIndex(b=>b.n==='4'), i3=out.findIndex(b=>b.n==='3'), i5=out.findIndex(b=>b.n==='5');
+  if(iL<0||i4<0||i3<0||i5<0) return out;
+  const L=out[iL], P=out[i4], e3=hm(out[i3].e), s5=hm(out[i5].s);
+  if(pos==='4'){ P.s=toHM(e3+10); P.e=toHM(e3+60); L.s=P.e; L.e=toHM(s5); }      // 3교시 → 쉬는시간 10분 → 4교시 50분 → 점심
+  else        { L.s=toHM(e3); L.e=toHM(s5-60); P.s=L.e; P.e=toHM(s5-10); }       // 3교시 → 점심 → 4교시 50분 → 쉬는시간 10분
+  const rest=out.filter(b=>b!==L&&b!==P), k=rest.findIndex(b=>b.n==='3')+1;
+  rest.splice(k,0,...(pos==='4'?[P,L]:[L,P]));
+  return rest;
 }
-document.getElementById('ttSave').onclick=()=>{
+function readTTDialog(){
   const bells=[], week={1:{},2:{},3:{},4:{},5:{}};
   ttDlg.querySelectorAll('#ttBody tr').forEach(tr=>{
-    const b={...tt.bells[+tr.dataset.i]};
+    const b={...ttDraft.bells[+tr.dataset.i]};
     b.s=tr.querySelector('[data-f=s]').value||b.s; b.e=tr.querySelector('[data-f=e]').value||b.e;
     bells.push(b);
     tr.querySelectorAll('[data-d]').forEach(inp=>{ const v=inp.value.trim(); if(v) week[inp.dataset.d][b.n]=v; });
   });
-  tt={bells,week}; saveTT(); ttDlg.close(); render();
+  return {bells,week};
+}
+function drawTT(){
+  const days=['월','화','수','목','금'];
+  document.getElementById('ttLunch').value=lunchPos(ttDraft.bells);
+  document.getElementById('ttBody').innerHTML = ttDraft.bells.map((b,i)=>`<tr data-i="${i}"${b.lunch?' class="lunch-row"':''}>
+    <th>${b.lunch?'🍚 점심':esc(b.n)+'교시'}</th>
+    <td><input type="time" data-f="s" value="${esc(b.s)}"></td><td><input type="time" data-f="e" value="${esc(b.e)}"></td>
+    ${days.map((_,d)=>b.lunch?'<td class="lunch-td">—</td>':`<td><input type="text" maxlength="12" data-d="${d+1}" value="${esc((ttDraft.week[d+1]||{})[b.n]||'')}" placeholder=""></td>`).join('')}
+  </tr>`).join('');
+}
+function openTT(){
+  ttDraft={bells:tt.bells.map(b=>({...b})), week:JSON.parse(JSON.stringify(tt.week||{}))};
+  drawTT(); ttDlg.showModal();
+}
+document.getElementById('ttLunch').addEventListener('change',e=>{
+  ttDraft=readTTDialog(); ttDraft.bells=moveLunch(ttDraft.bells, e.target.value); drawTT();
+});
+document.getElementById('ttSave').onclick=()=>{
+  tt=readTTDialog(); saveTT(); ttDlg.close(); render();
 };
 document.getElementById('ttReset').onclick=()=>{
   if(!confirm('종 시간을 기본값으로 되돌릴까요? (입력한 수업은 그대로 남아요)')) return;
-  tt.bells=DEFAULT_BELLS.map(b=>({...b})); saveTT(); openTT();
+  const keep=readTTDialog(); ttDraft={bells:DEFAULT_BELLS.map(b=>({...b})), week:keep.week}; drawTT();
 };
 document.getElementById('ttClose').onclick=()=>ttDlg.close();
 ttDlg.addEventListener('click',e=>{ if(e.target===ttDlg) ttDlg.close(); });
